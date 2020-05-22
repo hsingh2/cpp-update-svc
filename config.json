@@ -1,0 +1,28 @@
+{
+    "auth":{
+      "clientID": "one-portal-client-credential",
+      "username": "cppsvcci",
+      "authURL": "https://websec-oic.cable.comcast.com/as/authorization.oauth2",
+      "tokenURL": "https://websec-oic.cable.comcast.com/as/token.oauth2",
+      "renewInterval":6,
+      "scopes": ["profile", "openid"]
+    },
+    "mail":{
+      "mailhost": "mailrelay.comcast.com:25",
+      "fromEmail": "cpp-bulk-updates@comcast.com",
+      "subject":"CPP Bulk Update Process Notification",
+      "templates":{
+        "success":"template.html",
+        "error" : "error.html"
+      }
+    },
+    "http":{
+        "timeout":30,
+        "dataServiceURL":{
+            "update":"https://cpp-data-svc-dev.r3.app.cloud.comcast.net/api/v1/updateComment",
+            "verify":"https://cpp-data-svc-dev.r3.app.cloud.comcast.net/api/v1/verifyComment",
+            "add":"https://cpp-data-svc-dev.r3.app.cloud.comcast.net/api/v1/addComment"
+        },
+        "fileUploadURL":"https://artifactory.comcast.net/artifactory/cpp-bulkupdate/"
+    }
+}

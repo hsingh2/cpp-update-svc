@@ -1,0 +1,500 @@
+groups:
+  - name: build-and-deploy
+    jobs:
+      - unit
+      - build
+      - deploy-dev
+      - deploy-stg
+      - release
+      - deploy-prd
+  - name: PRs
+    jobs:
+      - test-pr
+  - name: version
+    jobs:
+      - major
+      - minor
+      - patch
+
+resource_types:
+  - name: pull-request
+    type: docker-image
+    source:
+      repository: teliaoss/github-pr-resource
+
+  - name: rally
+    type: docker-image
+    source:
+      repository: hub.comcast.net/concourse/rally-build-resource
+      tag: latest
+
+  - name: checkmarx-resource
+    type: docker-image
+    source:
+      repository: hub.comcast.net/devsecops/checkmarx-resource
+      tag: latest
+
+  - name: whitesource-resource
+    type: docker-image
+    source:
+      repository: hub.comcast.net/devsecops/whitesource-resource
+
+  #- name: sns
+  #  type: docker-image
+  #  source:
+  #    repository: hub.comcast.net/concourse/sns-resource
+  #    tag: 0.0.5
+
+  - name: swift
+    type: docker-image
+    source:
+      repository: databus23/concourse-swift-resource
+
+resources:
+  - name: pull-request
+    type: pull-request
+    check_every: 72h
+    webhook_token: ((newsvcaccount.webhook))
+    source:
+      repository: cpp/cpp-update-svc
+      access_token: ((newsvcaccount.gheaccesstoken))
+      v3_endpoint: https://github.comcast.com/api/v3/
+      v4_endpoint: https://github.comcast.com/api/graphql
+
+  - name: version
+    type: semver
+    source:
+      branch: version
+      driver: git
+      file: version
+      private_key: ((newsvcaccount.ghekey))
+      uri: git@github.comcast.com:cpp/cpp-update-svc.git
+    check_every: 72h
+
+  - name: cpp-update-svc
+    type: git
+    webhook_token: ((newsvcaccount.webhook))
+    check_every: 72h
+    source:
+      branch: master
+      uri: git@github.comcast.com:cpp/cpp-update-svc.git
+      private_key: ((newsvcaccount.ghekey))
+
+  - name: cpp-update-svc-config
+    type: git
+    webhook_token: ((newsvcaccount.webhook))
+    check_every: 72h
+    source:
+      branch: master
+      uri: git@github.comcast.com:cpp/cpp-update-svc-config.git
+      private_key: ((newsvcaccount.ghekey))
+
+  - name: rally-update
+    type: rally
+    check_every: 24h
+    source:
+      api_key: ((newsvcaccount.rallyToken))
+      rally_url: https://rally1.rallydev.com/slm/webservice/v2.0
+      build_definition: concourse-cpp-update-svc
+      project_id: 151512307268
+      use_tags: true
+
+  - name: checkmarx
+    type: checkmarx-resource
+    source:
+      user: Active Directory\((newsvcaccount.username))
+      password: ((newsvcaccount.password))
+      checkmarx_url: https://checkmarx.comcast.net
+
+  - name: whitesource
+    type: whitesource-resource
+    source:
+      apiKey: ((whitesource.api_key))
+      checkPolicies: true
+      resolveAllDependencies: true
+      productName: cpp-update-svc
+      includes: '**/*.c **/*.cc **/*.cp **/*.cpp **/*.cxx **/*.c++ **/*.h **/*.hpp **/*.hxx **/*.jar **/*.aar **/*.go'
+
+  - name: gh-release
+    type: github-release
+    check_every: 24h
+    source:
+      access_token: ((newsvcaccount.gheaccesstoken))
+      github_api_url: https://github.comcast.com/api/v3/
+      github_uploads_url: https://github.comcast.com/api/uploads/
+      repository: cpp-update-svc
+      user: cpp
+
+  - name: resource-deploy-dev
+    type: cf
+    check_every: 24h
+    source:
+      api: https://api.r3.app.cloud.comcast.net
+      username: ((newsvcaccount.username))
+      password: ((newsvcaccount.password))
+      organization: CPP
+      space: dev
+      skip_cert_check: false
+
+  - name: resource-deploy-stg
+    type: cf
+    check_every: 24h
+    source:
+      api: https://api.r3.app.cloud.comcast.net
+      username: ((newsvcaccount.username))
+      password: ((newsvcaccount.password))
+      organization: cpp
+      space: stg
+      skip_cert_check: false
+
+  - name: resource-deploy-prd-r3
+    type: cf
+    check_every: 24h
+    source:
+      api: https://api.r3.app.cloud.comcast.net
+      username: ((newsvcaccount.username))
+      password: ((newsvcaccount.password))
+      organization: CPP
+      space: prod
+      skip_cert_check: false
+      no_start: true
+
+  - name: resource-deploy-prd-r2
+    type: cf
+    check_every: 24h
+    source:
+      api: https://api.r2.app.cloud.comcast.net
+      username: ((newsvcaccount.username))
+      password: ((newsvcaccount.password))
+      organization: CPP
+      space: prod
+      skip_cert_check: false
+      no_start: true
+
+  - name: resource-deploy-prd-wc-r1
+    type: cf
+    check_every: 24h
+    source:
+      api: https://api.wc-r1.cf.comcast.net
+      username: ((newsvcaccount.username))
+      password: ((newsvcaccount.password))
+      organization: CPP
+      space: prod
+      skip_cert_check: false
+
+  - name: resource-deploy-prd-po-r1
+    type: cf
+    check_every: 24h
+    source:
+      api: https://api.po-r1.cf.comcast.net
+      username: ((newsvcaccount.username))
+      password: ((newsvcaccount.password))
+      organization: CPP
+      space: prod
+      skip_cert_check: false
+
+  #- name: post-sns
+  #  type: sns
+  #  check_every: 24h
+  #  source:
+  #    region: us-east-1
+  #    access_key: ((aws.access_key))
+  #    secret_key: ((aws.secret_key))
+  #    topic_arn: arn:aws:sns:us-east-1:532003773527:concourse-events
+
+  - name: resource-swift
+    type: swift
+    check_every: 24h
+    source:
+      container: ((os-swift.container))
+      regex: cpp-update-svc-(.*)
+      tenant_id: ((os-swift.tenantid))
+      domain: ((os-swift.domain))
+      username: ((newsvcaccount.username))
+      api_key: ((newsvcaccount.password))
+      auth_url: ((os-swift.authurl))
+
+jobs:
+  - name: test-pr
+    plan:
+    - get: pull-request
+      trigger: true
+      version: every
+    - put: pull-request
+      params:
+        path: pull-request
+        status: pending
+    - in_parallel:
+      - task: unit-test
+        file: pull-request/ci/unit.yml
+        input_mapping:
+          source_dir: pull-request
+        on_failure:
+          put: pull-request
+          params:
+            path: pull-request
+            status: failure
+      - task: cover-test
+        file: pull-request/ci/cover.yml
+        params:
+          MIN_PCT: 40
+        input_mapping:
+          source_dir: pull-request
+        on_failure:
+          put: pull-request
+          params:
+            path: pull-request
+            status: failure
+      - put: whitesource
+        params:
+          dir: pull-request
+          config:
+            projectName: pull-request
+        on_failure:
+          put: pull-request
+          params:
+            path: pull-request
+            status: failure
+      - put: checkmarx
+        params:
+          dir: pull-request
+          project_name: CxServer\Comcast-NBCUniversal\Comcast\tie-de\cpp-update-svc
+          exclude_paths: [vendor]
+          failOn: HIGH
+          full_scan: true
+        on_failure:
+          put: pull-request
+          params:
+            path: pull-request
+            status: failure
+    - put: pull-request
+      params:
+        path: pull-request
+        status: success
+
+  - name: unit
+    plan:
+      - in_parallel:
+        - get: cpp-update-svc
+          trigger: true
+        - get: cpp-update-svc-config
+          trigger: true
+      - get: version
+      - task: unit-test
+        file: cpp-update-svc/ci/unit.yml
+        input_mapping:
+          source_dir: cpp-update-svc
+        on_failure:
+          put: rally-update
+          params:
+            repo: cpp-update-svc
+            status: FAILURE
+            build_version: version/number
+
+  - name: build
+    plan:
+      - in_parallel:
+          - get: cpp-update-svc
+            passed: [unit]
+            trigger: true
+          - get: version
+            params:
+              bump: patch
+      - task: build
+        file: cpp-update-svc/ci/build.yml
+        input_mapping:
+          source_dir: cpp-update-svc
+      - put: version
+        params:
+          file: version/version
+      - put: resource-swift
+        params:
+          from: resource-swift/cpp-update-svc-(.*)
+
+  - name: deploy-dev
+    plan:
+      - in_parallel:
+        - get: cpp-update-svc
+          trigger: true
+          passed:
+            - build
+        - get: version
+          passed:
+            - build
+        - get: resource-swift
+          passed:
+            - build
+          trigger: true
+        - get: cpp-update-svc-config
+      - task: deploy
+        file: cpp-update-svc/ci/deploy.yml
+        vars:
+          env: "dev"
+        input_mapping:
+          source_dir: cpp-update-svc
+          config_dir: cpp-update-svc-config
+          resource: resource-swift
+      - put: resource-deploy-dev
+        params:
+          manifest: build-output/manifest.yml
+          environment_variables:
+            CF_USER: ((newsvcaccount.username))
+            CF_PASSWORD: ((newsvcaccount.password))
+            CLIENT_SECRET: ((websec-dev.tokensecret))
+            CPP_SERVICE_PASSWORD: ((newsvcaccount.password))
+            CPP_ARTIFACTORY_API_KEY: ((artifactory.api-key))
+  - name: deploy-stg
+    plan:
+      - in_parallel:
+        - get: cpp-update-svc
+          trigger: true
+          passed:
+            - build
+        - get: version
+          passed:
+            - build
+        - get: resource-swift
+          passed:
+            - build
+          trigger: true
+        - get: cpp-update-svc-config
+      - task: deploy
+        file: cpp-update-svc/ci/deploy.yml
+        vars:
+          env: "stg"
+        input_mapping:
+          source_dir: cpp-update-svc
+          config_dir: cpp-update-svc-config
+          resource: resource-swift
+      - put: resource-deploy-stg
+        params:
+          manifest: build-output/manifest.yml
+          environment_variables:
+            CF_USER: ((newsvcaccount.username))
+            CF_PASSWORD: ((newsvcaccount.password))
+            CLIENT_SECRET: ((websec-dev.tokensecret))
+            CPP_SERVICE_PASSWORD: ((newsvcaccount.password))
+            CPP_ARTIFACTORY_API_KEY: ((artifactory.api-key))
+  - name: release
+    serial_groups: [version]
+    plan:
+      - get: version
+      - get: cpp-update-svc
+        passed:
+          - deploy-dev
+          - deploy-stg
+      - task: generate-release-notes
+        file: cpp-update-svc/ci/generate-release-notes.yml
+      - put: gh-release
+        params:
+          name: release-notes/release-name
+          tag: release-notes/release-name
+          body: release-notes/notes.md
+          commitish: release-notes/commitish
+
+  - name: deploy-prd
+    plan:
+      - in_parallel:
+        - get: cpp-update-svc
+          trigger: true
+          passed:
+            - release
+        - get: version
+          passed:
+            - release
+        - get: resource-swift
+        - get: cpp-update-svc-config
+      - task: deploy
+        file: cpp-update-svc/ci/deploy.yml
+        input_mapping:
+          source_dir: cpp-update-svc
+          config_dir: cpp-update-svc-config
+          resource: resource-swift
+        vars:
+          env: "prd"
+        #on_failure:
+        #  put: rally-update
+        #  params:
+        #    repo: cpp-update-svc
+        #    status: FAILURE
+        #    build_version: version/number
+        #on_success:
+        #  put: rally-update
+        #  params:
+        #    repo: cpp-update-svc
+        #    status: SUCCESS
+        #    build_version: version/number
+      - in_parallel:
+        - put: resource-deploy-prd-r3
+          params:
+            manifest: build-output/manifest.yml
+            environment_variables:
+              CF_USER: ((newsvcaccount.username))
+              CF_PASSWORD: ((newsvcaccount.password))
+              CLIENT_SECRET: ((websec-prd.tokensecret))
+              CPP_SERVICE_PASSWORD: ((newsvcaccount.password))
+              CPP_ARTIFACTORY_API_KEY: ((artifactory.api-key))
+        - put: resource-deploy-prd-r2
+          params:
+            manifest: build-output/manifest.yml
+            environment_variables:
+              CF_USER: ((newsvcaccount.username))
+              CF_PASSWORD: ((newsvcaccount.password))
+              CLIENT_SECRET: ((websec-prd.tokensecret))
+              CPP_SERVICE_PASSWORD: ((newsvcaccount.password))
+              CPP_ARTIFACTORY_API_KEY: ((artifactory.api-key))
+        - put: resource-deploy-prd-wc-r1
+          params:
+            manifest: build-output/manifest.yml
+            environment_variables:
+              CF_USER: ((newsvcaccount.username))
+              CF_PASSWORD: ((newsvcaccount.password))
+              CLIENT_SECRET: ((websec-prd.tokensecret))
+              CPP_SERVICE_PASSWORD: ((newsvcaccount.password))
+              CPP_ARTIFACTORY_API_KEY: ((artifactory.api-key))
+        - put: resource-deploy-prd-po-r1
+          params:
+            manifest: build-output/manifest.yml
+            environment_variables:
+              CF_USER: ((newsvcaccount.username))
+              CF_PASSWORD: ((newsvcaccount.password))
+              CLIENT_SECRET: ((websec-prd.tokensecret))
+              CPP_SERVICE_PASSWORD: ((newsvcaccount.password))
+              CPP_ARTIFACTORY_API_KEY: ((artifactory.api-key))
+      #- task: prep-sns
+      #  file: cpp-update-svc/ci/create-message.yml
+      #- put: post-sns
+      #  params:
+      #    message_path: message/message.json
+      #    event_type: deploy-event
+
+  - name: major
+    serial_groups: [version]
+    plan:
+      - get: version
+        params:
+          bump: major
+      - put: version
+        params:
+          file: version/number
+
+  - name: minor
+    serial_groups: [version]
+    plan:
+      - get: version
+        params:
+          bump: minor
+      - put: version
+        params:
+          file: version/number
+
+  - name: patch
+    serial_groups: [version]
+    plan:
+      - get: version
+        passed: [release]
+        params:
+          bump: patch
+      - put: version
+        params:
+          file: version/number

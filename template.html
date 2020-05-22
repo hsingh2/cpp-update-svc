@@ -1,0 +1,56 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+
+</head>
+<style>
+table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+td, th {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+}
+
+tr:nth-child(even) {
+  background-color: #dddddd;
+}
+</style>
+
+<body>
+  <h1 align="center">CPP BULK UPDATES</h1>
+<p>
+    <a>Hi {{.UserName}}</br></a>
+    <a><br>This is to inform you that we have processed your Bulk Update file and the records have been updated in the ITRC databases.</br></a>
+    <a><br>Also find the attached list of the records which failed during the updates.</br></a> 
+    <table align="center" style="width:50%;">
+      <th>ITRC_DB_ID</th>
+      <th>LOC_AT_MD5</th>
+      <th>PIID</th>
+      <th>Error</th>
+      {{range .Body}}
+      <tr>
+        <td>{{.ItrcDBID}}</td>
+        <td>{{.LocationAttributeMD5}}</td>
+        <td>{{.PIID}}</td>
+        <td>{{.Err}}</td>
+      </tr>
+      {{end}}
+    </table>
+</p>
+
+<hr>
+<footer>
+  <p>
+    <a>Posted by: CPP Team</a> 
+  <a font color="red" ><br> Please do not reply to this email.</a>
+  </p>
+</footer>
+    
+</body>
+
+</html>
